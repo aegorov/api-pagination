@@ -5,7 +5,6 @@ module Rails
     def paginate(*options_or_collection)
       options    = options_or_collection.extract_options!
       collection = options_or_collection.first
-
       return _paginate_collection(collection, options) if collection
 
       response_format = _discover_format(options)
@@ -48,7 +47,7 @@ module Rails
       total_header    = ApiPagination.config.total_header
       per_page_header = ApiPagination.config.per_page_header
       page_header     = ApiPagination.config.page_header
-      include_total   = ApiPagination.config.include_total
+      include_total   = options.key?(:include_total) ? options[:include_total] : ApiPagination.config.include_total
 
       headers['Link'] = links.join(', ') unless links.empty?
       headers[per_page_header] = options[:per_page].to_s

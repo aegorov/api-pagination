@@ -4,27 +4,29 @@ module Grape
       Grape::Endpoint.class_eval do
         def paginate(collection)
           per_page = ApiPagination.config.per_page_param(params) || route_setting(:per_page)
-
           options = {
             :page     => ApiPagination.config.page_param(params),
-            :per_page => [per_page, route_setting(:max_per_page)].compact.min
+            :per_page => [per_page, route_setting(:max_per_page)].compact.min,
+            :include_total => route_setting(:include_total)
           }
           collection, pagy = ApiPagination.paginate(collection, options)
 
-          links = (header['Link'] || "").split(',').map(&:strip)
-          url   = request.url.sub(/\?.*$/, '')
-          pages = ApiPagination.pages_from(pagy || collection, options)
-
-          pages.each do |k, v|
-            old_params = Rack::Utils.parse_nested_query(request.query_string)
-            new_params = old_params.merge('page' => v)
-            links << %(<#{url}?#{new_params.to_param}>; rel="#{k}")
-          end
-
+          links           = (header['Link'] || "").split(',').map(&:strip)
+          url             = request.url.sub(/\?.*$/, '')
           total_header    = ApiPagination.config.total_header
           per_page_header = ApiPagination.config.per_page_header
           page_header     = ApiPagination.config.page_header
-          include_total   = ApiPagination.config.include_total
+          include_total   = options.key?(:include_total) ? options[:include_total] : ApiPagination.config.include_total
+
+          if include_total
+            pages = ApiPagination.pages_from(pagy || collection, options)
+
+            pages.each do |k, v|
+              old_params = Rack::Utils.parse_nested_query(request.query_string)
+              new_params = old_params.merge('page' => v)
+              links << %(<#{url}?#{new_params.to_param}>; rel="#{k}")
+            end
+          end
 
           header 'Link',          links.join(', ') unless links.empty?
           header total_header,    ApiPagination.total_from(pagy || collection).to_s if include_total
@@ -37,6 +39,7 @@ module Grape
 
       base.class_eval do
         def self.paginate(options = {})
+          route_setting :include_total, options[:include_total]
           route_setting :per_page, options[:per_page]
           route_setting :max_per_page, options[:max_per_page]
 
